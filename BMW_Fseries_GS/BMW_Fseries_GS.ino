@@ -57,12 +57,14 @@ uint16_t chargecurrent = 200;
 bool candebug = 0;
 
 //Revied info
-bool Up1, Up2, Down1, Down2 = false;
+bool Up1, Up2, Down1, Down2, SideUp, SideDown = false;
 bool ParkBut = false;
+bool SportMode = false;
 
-bool DirChanged, ParkChange = false;
+bool DirChanged, ParkChange, SportChange = false;
 uint8_t PrkCnt = 0;
 
+uint16_t SportNum =0;
 
 uint8_t Cnt3FD = 0;
 uint16_t ShiftState = 0;
@@ -150,7 +152,7 @@ void sendcan() {
   mes[1] = Cnt3FD;
   mes[2] = Dir;
   mes[3] = 0x00;
-  mes[4] = 0x00;
+  mes[4] = SportNum;
   mes[0] = crc8.get_crc8(mes, 5, 0x70, 1);
 
   CAN0.sendMsgBuf(0x3FD, 0, 5, mes);
@@ -188,6 +190,8 @@ void RX197() {
   Down1 = false;
   Down2 = false;
   ParkBut = false;
+  SideDown = false;
+  SideUp = false;
 
 
   switch (rxBuf[2]) {
@@ -209,6 +213,20 @@ void RX197() {
 
     case 0x0E:
       DirChanged = false;
+      SportMode = false;
+      break;
+
+    case 0x7E:
+      SportMode = true;
+      SportChange = false;
+      break;
+
+    case 0x6E:
+      SideDown = true;
+      break;
+
+    case 0x5E:
+      SideUp = true;
       break;
 
     default:
@@ -220,7 +238,7 @@ void RX197() {
   switch (rxBuf[3]) {
     case 0xD5:
       PrkCnt++;
-      if (PrkCnt > 5) {
+      if (PrkCnt > 2) {
         ParkBut = true;
       }
       break;
@@ -274,9 +292,28 @@ void UpdateShifter() {
       if (Up1 == true && DirChanged == false) {
         Dir = Neutral;
         DirChanged = true;
+      } else if (SportMode == true) {
+        Dir = Sport;
       } else if (ParkBut == true && ParkChange == false) {
         Dir = Park;
         ParkChange = true;
+      }
+      break;
+
+    case Sport:
+      if (SportMode == false) {
+        Dir = Drive;
+      }else if (ParkBut == true && ParkChange == false) {
+        Dir = Park;
+        ParkChange = true;
+      }
+
+      if (SideDown == true && SportChange == false) {
+        SportNum++;
+        SportChange = true;
+      } else if (SideUp == true && SportChange == false && SportNum > 0) {
+        SportNum--;
+        SportChange = true;
       }
       break;
 
